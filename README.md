@@ -1,4 +1,4 @@
-# PKG
+# TTI
 
 <SHORT-PKG-DESCRIPTION>
 
@@ -11,13 +11,13 @@
 Run the following command in your python venv:
 
 ```
-pip install git+https://github.com/avivilloz/<PKG-NAME>.git@main#egg=<PKG-NAME>
+pip install git+https://github.com/avivilloz/tti.git@main#egg=tti
 ```
 
 Or add the following line to your project's `requirement.txt` file:
 
 ```
-git+https://github.com/avivilloz/<PKG-NAME>.git@main#egg=<PKG-NAME>
+git+https://github.com/avivilloz/tti.git@main#egg=tti
 ```
 
 And run the following command:
@@ -28,9 +28,8 @@ pip install -r requirements.txt
 
 ## How to use:
 
-`file.py`
 ```
-from <PKG-NAME> import <PKG-FUNCTION>
+from tti import generate_images
 
-# Use <PKG-FUNCTION>
+generate_images()
 ```

@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="<PKG-NAME>",
+    name="tti",
     version="0.1.0",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
@@ -13,7 +13,7 @@ setup(
     description="<SHORT-PKG-DESCRIPTION>",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/avivilloz/<PKG-NAME>",
+    url="https://github.com/avivilloz/tti",
     python_requires=">=3.6",
     classifiers=[
         "Programming Language :: Python :: 3",

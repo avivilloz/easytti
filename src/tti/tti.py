@@ -170,11 +170,11 @@ def generate_and_wait_for_images(
             reason = elements[0].text
             LOG.error(f"Error: {reason}")
             if reason == "You can't submit any more prompts":
-                raise NoMorePrompts
+                raise NoMorePrompts(reason)
             elif reason == "Unsafe image content detected":
-                raise UnsafeImageContent
+                raise UnsafeImageContent(reason)
             elif reason == "Content warning":
-                raise ContentWarning
+                raise ContentWarning(reason)
 
         if (time() - start_time) >= 60:
             if attempts == 0:

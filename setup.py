@@ -6,7 +6,8 @@ setup(
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     install_requires=[
-        "<PKG-DENPENDENCY>",
+        "retry",
+        "selenium",
     ],
     author="Aviv Illoz",
     author_email="avivilloz@gmail.com",
@@ -17,7 +18,7 @@ setup(
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/avivilloz/tti",
-    python_requires=">=3.6",
+    python_requires=">=3.10",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

@@ -75,7 +75,7 @@ except Exception as e:
     print(f"An unexpected error occurred: {str(e)}")
 ```
 
-## Logging
+## Logging:
 
 TTI uses Python's built-in logging module. To see log messages, you can set up basic logging in your script:
 

@@ -26,7 +26,7 @@ This tool is ideal for developers, researchers, and content creators who need to
 
 Run the following command in your python venv:
 
-```
+```sh
 pip install git+https://github.com/avivilloz/tti.git@main#egg=tti
 ```
 
@@ -38,13 +38,13 @@ git+https://github.com/avivilloz/tti.git@main#egg=tti
 
 And run the following command:
 
-```
+```sh
 pip install -r requirements.txt
 ```
 
 ## How to use:
 
-```
+```python
 from tti import generate_images
 from tti.exceptions import NoMorePrompts, UnsafeImageContent, ContentWarning
 
@@ -73,4 +73,14 @@ except ContentWarning:
     print("There was a content warning for this prompt.")
 except Exception as e:
     print(f"An unexpected error occurred: {str(e)}")
+```
+
+## Logging
+
+TTI uses Python's built-in logging module. To see log messages, you can set up basic logging in your script:
+
+```python
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 ```

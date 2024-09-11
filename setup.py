@@ -10,7 +10,10 @@ setup(
     ],
     author="Aviv Illoz",
     author_email="avivilloz@gmail.com",
-    description="<SHORT-PKG-DESCRIPTION>",
+    description=(
+        "Automates the process of generating and downloading images from "
+        "Bing's image creation service using Selenium WebDriver."
+    ),
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/avivilloz/tti",

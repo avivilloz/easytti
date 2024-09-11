@@ -1,31 +1,67 @@
 import os
 import logging
-import retry
+from functools import wraps
+from retry import retry
 from time import time, sleep
+from typing import Tuple, List, Optional
+from contextlib import contextmanager
+from exceptions import *
 from selenium import webdriver
-from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from .exceptions import *
+from selenium.common.exceptions import (
+    TimeoutException,
+    NoSuchElementException,
+    StaleElementReferenceException,
+)
 
 LOG = logging.getLogger(__name__)
 
-
-def elements_are_present(driver, by, value):
-    elements = driver.find_elements(by, value)
-    if elements:
-        return elements
-    else:
-        return False
+MAX_RETRIES = 3
+RETRY_DELAY = 2
+RETRY_BACKOFF = 2
+DEFAULT_TIMEOUT = 10
 
 
-def create_chrome_options(download_directory):
+@contextmanager
+def managed_driver(options: Options):
+    driver = webdriver.Chrome(options=options)
+    try:
+        yield driver
+    finally:
+        driver.quit()
+
+
+def validate_input(func):
+    @wraps(func)
+    def wrapper(
+        dst_dir: str,
+        image_description: str,
+        bing_email: str,
+        bing_password: str,
+        timeout: int = DEFAULT_TIMEOUT,
+    ):
+        if not dst_dir or not os.path.isdir(dst_dir):
+            raise ValueError("Invalid destination directory")
+        if not image_description:
+            raise ValueError("Image description cannot be empty")
+        if not bing_email or not bing_password:
+            raise ValueError("Bing credentials cannot be empty")
+        if timeout <= 0:
+            raise ValueError("Timeout must be positive")
+        return func(dst_dir, image_description, bing_email, bing_password, timeout)
+
+    return wrapper
+
+
+def create_chrome_options(download_dir: str) -> Options:
+    LOG.info(f"Creating Chrome options for download directory: {download_dir}")
     chrome_options = Options()
     chrome_prefs = {
-        "download.default_directory": download_directory,
+        "download.default_directory": download_dir,
         "download.prompt_for_download": False,
         "download.directory_upgrade": True,
         "safebrowsing.enabled": True,
@@ -34,145 +70,212 @@ def create_chrome_options(download_directory):
     return chrome_options
 
 
+def elements_are_present(
+    driver: webdriver.Chrome, by: str, value: str
+) -> Optional[List[webdriver.remote.webelement.WebElement]]:
+    elements = driver.find_elements(by, value)
+    return elements if elements else None
+
+
+@validate_input
 def generate_images(
-    dst_dir: str, image_description: str, bing_email: str, bing_password: str
-):
+    download_dir: str,
+    image_description: str,
+    bing_email: str,
+    bing_password: str,
+    timeout: int = DEFAULT_TIMEOUT,
+) -> Tuple[int, int]:
     """
     Generates up to 4 images
     """
-    os.makedirs(dst_dir, exist_ok=True)
+    LOG.info(f"Starting image generation for prompt: '{image_description}'")
 
-    chrome_options = create_chrome_options(dst_dir)
-    driver = webdriver.Chrome(options=chrome_options)
-    wait = WebDriverWait(driver, 10)
+    chrome_options = create_chrome_options(download_dir)
 
+    with managed_driver(chrome_options) as driver:
+        wait = WebDriverWait(driver, timeout)
+        login_to_bing(driver, wait, bing_email, bing_password)
+        navigate_to_image_creation(driver)
+        generate_and_wait_for_images(driver, wait, image_description)
+        result = download_images(driver, wait, download_dir)
+        LOG.info(f"Image generation complete for prompt: '{image_description}'")
+        return result
+
+
+def login_to_bing(
+    driver: webdriver.Chrome, wait: WebDriverWait, email: str, password: str
+) -> None:
+    LOG.info("Navigating to Bing login page.")
     driver.get("https://login.live.com/")
 
+    LOG.info("Entering email address.")
     email_input = wait.until(EC.presence_of_element_located((By.NAME, "loginfmt")))
-    email_input.send_keys(bing_email)
+    email_input.send_keys(email)
     email_input.send_keys(Keys.RETURN)
 
+    LOG.info("Entering password.")
     password_input = wait.until(EC.presence_of_element_located((By.NAME, "passwd")))
-    password_input.send_keys(bing_password)
+    password_input.send_keys(password)
     password_input.send_keys(Keys.RETURN)
 
+    LOG.info("Successfully logged in to Bing.")
+
+
+def navigate_to_image_creation(driver: webdriver.Chrome) -> None:
+    LOG.info("Navigating to Bing image creation page.")
     driver.get("https://www.bing.com/images/create")
 
-    is_ready = False
-    while not is_ready:
-        LOG.info(f"Generate Image Prompt: {image_description}")
 
-        search_box = wait.until(EC.presence_of_element_located((By.NAME, "q")))
-        search_box.clear()
-        search_box.send_keys(image_description)
+@retry(
+    exceptions=ImageGenerationError,
+    tries=MAX_RETRIES,
+    delay=RETRY_DELAY,
+    backoff=RETRY_BACKOFF,
+    logger=LOG,
+)
+def generate_and_wait_for_images(
+    driver: webdriver.Chrome, wait: WebDriverWait, image_description: str
+) -> None:
+    LOG.info(f"Generate Image Prompt: {image_description}")
 
-        create_button = wait.until(EC.element_to_be_clickable((By.ID, "create_btn_c")))
-        create_button.click()
+    search_box = wait.until(EC.presence_of_element_located((By.NAME, "q")))
+    search_box.clear()
+    search_box.send_keys(image_description)
 
-        try:
-            button = wait.until(EC.element_to_be_clickable((By.ID, "acceptButton")))
-            button.click()
-        except TimeoutException:
-            pass
-
-        elements = None
-        start = time()
-        attempts = 0
-
-        while not elements:
-            sleep(5)
-
-            if elements := elements_are_present(
-                driver, By.CSS_SELECTOR, "a.iusc, a.single-img-link"
-            ):
-                is_ready = True
-            elif elements := elements_are_present(
-                driver, By.CSS_SELECTOR, "div.gil_err_mt"
-            ):
-                reason = elements[0].text
-                LOG.error(f"Error: {reason}")
-                if reason == "You can't submit any more prompts":
-                    raise NoMorePrompts
-                elif reason == "Unsafe image content detected":
-                    raise UnsafeImageContent
-                elif reason == "Content warning":
-                    raise ContentWarning
-
-            if not elements and ((time.time() - start) >= 60):
-                if attempts == 0:
-                    driver.refresh()
-                    attempts += 1
-                else:
-                    elements = True
-                start = time()
-
-    # elements = driver.find_elements(by, value)
-
-    total_images = len(elements)
-    hrefs = []
-    original_window = driver.current_window_handle
-    for element in elements:
-        href = None
-        try:
-            href = wait.until(lambda d: element.get_attribute("href"))
-            time.sleep(5)
-            href = element.get_attribute("href")
-
-            original_handles = driver.window_handles
-            driver.execute_script(f"window.open('{href}', '_blank');")
-            wait.until(EC.new_window_is_opened(original_handles))
-            time.sleep(5)
-            driver.switch_to.window(driver.window_handles[-1])
-
-            download_button = wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "div.action.dld.nofocus"))
-            )
-            download_button.click()
-            time.sleep(5)
-
-            driver.close()
-            driver.switch_to.window(original_window)
-
-        except Exception as e:
-            total_images -= 1
-            hrefs.append(href)
-            LOG.error(f"Error processing href {href}: {e}")
+    LOG.info("Clicking on the create button to generate images.")
+    create_button = wait.until(EC.element_to_be_clickable((By.ID, "create_btn_c")))
+    create_button.click()
 
     try:
-        driver.quit()
-    finally:
-        if total_images == 0:
-            raise Exception(f"Error processing hrefs: {hrefs}")
+        button = wait.until(EC.element_to_be_clickable((By.ID, "acceptButton")))
+        LOG.info("Clicked on the accept button.")
+        button.click()
+    except TimeoutException:
+        LOG.info("No accept button found, proceeding without it.")
+
+    start_time = time()
+    attempts = 0
+    while True:
+        LOG.info("Waiting for images to generate...")
+        sleep(5)
+
+        if elements := elements_are_present(
+            driver, By.CSS_SELECTOR, "a.iusc, a.single-img-link"
+        ):
+            LOG.info("Images are ready for download.")
+            break
+        elif elements := elements_are_present(
+            driver, By.CSS_SELECTOR, "div.gil_err_mt"
+        ):
+            reason = elements[0].text
+            LOG.error(f"Error: {reason}")
+            if reason == "You can't submit any more prompts":
+                raise NoMorePrompts
+            elif reason == "Unsafe image content detected":
+                raise UnsafeImageContent
+            elif reason == "Content warning":
+                raise ContentWarning
+
+        if (time() - start_time) >= 60:
+            if attempts == 0:
+                LOG.info("Refreshing the page due to timeout.")
+                driver.refresh()
+                attempts += 1
+                start_time = time()
+            else:
+                LOG.error("Failed to generate images after multiple attempts.")
+                raise ImageGenerationError(
+                    "Failed to generate images after multiple attempts"
+                )
 
 
-@retry(exceptions=Exception, tries=3, delay=2)
-def download_images():
+@retry(
+    (ElementError, StaleElementReferenceException, TimeoutException),
+    tries=MAX_RETRIES,
+    delay=RETRY_DELAY,
+    backoff=RETRY_BACKOFF,
+    logger=LOG,
+)
+def get_href_with_retry(element, wait):
+    LOG.info("Attempting to get href attribute.")
+    href = wait.until(lambda d: element.get_attribute("href"))
+    if not href:
+        LOG.warning("Failed to get href attribute. Raising ElementError.")
+        raise ElementError("Failed to get href")
+    LOG.info(f"Successfully retrieved href: {href}")
+    return href
+
+
+def wait_for_download(
+    download_dir: str, initial_file_count: int, timeout: int = 30
+) -> bool:
+    LOG.info(f"Waiting for file to download in {download_dir}")
+    start_time = time()
+    while time() - start_time < timeout:
+        current_file_count = len(os.listdir(download_dir))
+        if current_file_count > initial_file_count:
+            LOG.info("New file detected in download directory")
+            return True
+        sleep(0.5)
+    LOG.warning(f"Download timeout after {timeout} seconds")
+    return False
+
+
+@retry(
+    (ElementError, TimeoutException, NoSuchElementException),
+    tries=MAX_RETRIES,
+    delay=RETRY_DELAY,
+    backoff=RETRY_BACKOFF,
+    logger=LOG,
+)
+def download_images(driver: webdriver.Chrome, wait: WebDriverWait, download_dir: str):
+    elements = driver.find_elements(By.CSS_SELECTOR, "a.iusc, a.single-img-link")
     total_images = len(elements)
-    hrefs = []
+    successful_downloads = 0
     original_window = driver.current_window_handle
-    for element in elements:
-        href = None
-        try:
-            href = wait.until(lambda d: element.get_attribute("href"))
-            time.sleep(5)
-            href = element.get_attribute("href")
 
-            original_handles = driver.window_handles
-            driver.execute_script(f"window.open('{href}', '_blank');")
-            wait.until(EC.new_window_is_opened(original_handles))
-            time.sleep(5)
+    LOG.info(f"Starting download process for {total_images} images.")
+
+    for index, element in enumerate(elements, 1):
+        try:
+            href = get_href_with_retry(element, wait)
+            LOG.info(f"Processing image {index}/{total_images}: {href}")
+
+            driver.execute_script("window.open();")
             driver.switch_to.window(driver.window_handles[-1])
+            driver.get(href)
 
             download_button = wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "div.action.dld.nofocus"))
             )
-            download_button.click()
-            time.sleep(5)
 
-            driver.close()
+            initial_file_count = len(os.listdir(download_dir))
+
+            download_button.click()
+            LOG.info(f"Clicked download button for image {index}/{total_images}")
+
+            if wait_for_download(download_dir, initial_file_count):
+                successful_downloads += 1
+                LOG.info(f"Successfully downloaded image {index}/{total_images}")
+            else:
+                LOG.warning(
+                    f"Download may have failed for image {index}/{total_images}"
+                )
+
+        except (ElementError, TimeoutException, NoSuchElementException) as e:
+            error_type = type(e).__name__
+            LOG.error(
+                f"{error_type} while processing image {index}/{total_images}: {e}",
+                exc_info=True,
+            )
+            raise
+        finally:
+            if len(driver.window_handles) > 1:
+                driver.close()
             driver.switch_to.window(original_window)
 
-        except Exception as e:
-            total_images -= 1
-            hrefs.append(href)
-            LOG.error(f"Error processing href {href}: {e}")
+    LOG.info(
+        f"Download complete. Successfully downloaded {successful_downloads}/{total_images} images."
+    )
+
+    return successful_downloads, total_images

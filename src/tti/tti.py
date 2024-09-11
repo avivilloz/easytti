@@ -5,7 +5,7 @@ from retry import retry
 from time import time, sleep
 from typing import Tuple, List, Optional
 from contextlib import contextmanager
-from exceptions import *
+from .exceptions import *
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys

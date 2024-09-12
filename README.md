@@ -1,4 +1,4 @@
-# Easy TTI (Text-to-Image Generator)
+# TTI Generator (Text-to-Image Generator)
 
 This Python package automates the process of generating and downloading images from Bing's image creation service using Selenium WebDriver. It handles user authentication, navigates through the image creation process, and manages the download of generated images with built-in error handling and retry mechanisms.
 
@@ -27,13 +27,13 @@ This tool is ideal for developers, researchers, and content creators who need to
 Run the following command in your python venv:
 
 ```sh
-pip install git+https://github.com/avivilloz/easytti.git@main#egg=easytti
+pip install git+https://github.com/avivilloz/tti_generator.git@main#egg=tti_generator
 ```
 
 Or add the following line to your project's `requirement.txt` file:
 
 ```
-git+https://github.com/avivilloz/easytti.git@main#egg=easytti
+git+https://github.com/avivilloz/tti_generator.git@main#egg=tti_generator
 ```
 
 And run the following command:
@@ -45,8 +45,8 @@ pip install -r requirements.txt
 ## How to use:
 
 ```python
-from easytti import generate_images
-from easytti.exceptions import NoMorePrompts, UnsafeImageContent, ContentWarning
+from tti_generator import generate_images
+from tti_generator.exceptions import NoMorePrompts, UnsafeImageContent, ContentWarning
 
 # Define your parameters
 dst_dir = "/path/to/download/directory"

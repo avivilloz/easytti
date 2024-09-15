@@ -16,3 +16,7 @@ class ElementError(Exception):
 
 class ImageGenerationError(Exception):
     pass
+
+
+class ReviewRequired(Exception):
+    pass

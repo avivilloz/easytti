@@ -175,6 +175,8 @@ def generate_and_wait_for_images(
                 raise UnsafeImageContent(reason)
             elif reason == "Content warning":
                 raise ContentWarning(reason)
+            elif reason == "This prompt is being reviewed":
+                raise ReviewRequired(reason)
 
         if (time() - start_time) >= 60:
             if attempts == 0:

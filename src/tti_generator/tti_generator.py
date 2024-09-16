@@ -177,6 +177,9 @@ def generate_and_wait_for_images(
                 raise ContentWarning(reason)
             elif reason == "This prompt is being reviewed":
                 raise ReviewRequired(reason)
+            elif reason == "We're sorry — we've run into an issue.":
+                handle_panda(driver=driver, wait=wait)
+
 
         if (time() - start_time) >= 60:
             if attempts == 0:
@@ -281,3 +284,24 @@ def download_images(driver: webdriver.Chrome, wait: WebDriverWait, download_dir:
     )
 
     return successful_downloads, total_images
+
+
+def handle_panda(driver: webdriver.Chrome, wait: WebDriverWait):
+    original_tab = driver.current_window_handle
+
+    driver.execute_script("window.open('');")
+    driver.switch_to.window(driver.window_handles[-1])
+    driver.get("https://www.bing.com/account/general")
+
+    element = wait.until(
+        EC.element_to_be_clickable(
+            (By.CSS_SELECTOR, "a[href*='setlang=en'][h='ID=SERP,5024.1']")
+        )
+    )
+    element.click()
+
+    driver.close()
+
+    driver.switch_to.window(original_tab)
+
+    driver.refresh()

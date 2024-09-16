@@ -20,3 +20,7 @@ class ImageGenerationError(Exception):
 
 class ReviewRequired(Exception):
     pass
+
+
+class RanIntoAnIssue(Exception):
+    pass

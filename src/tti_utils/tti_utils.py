@@ -18,6 +18,8 @@ from selenium.common.exceptions import (
     StaleElementReferenceException,
 )
 
+__all__ = ["generate_images"]
+
 LOG = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
@@ -179,7 +181,6 @@ def generate_and_wait_for_images(
                 raise ReviewRequired(reason)
             elif reason == "We're sorry — we've run into an issue.":
                 handle_panda(driver=driver, wait=wait)
-
 
         if (time() - start_time) >= 60:
             if attempts == 0:

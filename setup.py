@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="tti_generator",
+    name="tti_utils",
     version="0.1.0",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
@@ -17,7 +17,7 @@ setup(
     ),
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/avivilloz/tti_generator",
+    url="https://github.com/avivilloz/tti_utils",
     python_requires=">=3.10",
     classifiers=[
         "Programming Language :: Python :: 3",
